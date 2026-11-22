@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141d2b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ROQ">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>ROQ Questioning</title>
+<style>
+/* Palette: navy field, one colour per component (white you, blue object, green known, yellow others, red unknown).
+   Layout: fixed header, collapsible model map, scrolling step, fixed nav bar. Single dark theme by choice. */
+:root{
+  --bg:#141d2b; --panel:#1a2536; --panel2:#213049; --line:#2c3c56;
+  --text:#e8eef7; --muted:#8d9db6;
+  --you:#ffffff; --obj:#17a2ff; --known:#2fd25a; --other:#ffd02b; --unk:#ff4a1c;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+  -webkit-text-size-adjust:100%;color-scheme:dark;overscroll-behavior:none}
+button,input,textarea{font:inherit;color:inherit;touch-action:manipulation}
+#app{height:100%;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);
+  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size:24px 24px}
+header{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px 8px}
+.logo{font-family:var(--mono);font-weight:700;font-size:13px;letter-spacing:.06em;border:2px solid var(--text);border-radius:6px;padding:6px 10px;white-space:nowrap}
+.hbtn{font-family:var(--mono);font-size:12px;letter-spacing:.08em;background:transparent;border:1px solid var(--line);border-radius:6px;padding:9px 12px;min-height:40px;color:var(--muted)}
+.hbtn:active{background:var(--panel2)}
+#mapwrap{flex:none;padding:0 12px;max-height:38vh;overflow:hidden;transition:max-height .2s,opacity .2s}
+#mapwrap.off{max-height:0;opacity:0}
+#mapwrap svg{display:block;width:100%;height:auto;max-height:34vh}
+.maplab{font-family:var(--mono);font-size:11px;line-height:1.6;letter-spacing:.04em;text-align:center;color:var(--text);padding:2px 0 4px}
+#maptoggle{flex:none;margin:0 16px;align-self:flex-end;background:none;border:0;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.1em;padding:4px 0;min-height:28px}
+main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 16px 24px}
+footer{flex:none;display:flex;gap:10px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:rgba(20,29,43,.96)}
+.btn{flex:1;min-height:50px;border-radius:8px;border:1.5px solid var(--text);background:transparent;font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.1em}
+.btn.primary{background:var(--text);color:var(--bg)}
+.btn:active{opacity:.7}
+.btn:disabled{opacity:.3}
+.ghost{background:none;border:1px solid var(--line);border-radius:6px;color:var(--muted);font-family:var(--mono);font-size:12px;letter-spacing:.06em;padding:10px 12px;min-height:40px}
+.ghost:active{background:var(--panel2)}
+.crumb{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--muted);margin:2px 0 6px}
+.segs{display:flex;gap:4px;margin:0 0 12px}
+.segs button{flex:1;height:8px;padding:0;border:0;border-radius:2px;background:var(--line);min-height:0}
+.segs button.on{background:var(--text)}
+.segs button.cur{background:var(--c,var(--text));box-shadow:0 0 8px var(--c,var(--text))}
+h1{font-size:22px;line-height:1.2;margin:0 0 10px;font-weight:650;text-wrap:balance}
+.lab{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin:16px 0 6px}
+input[type=text],textarea{width:100%;background:var(--panel);border:1.5px solid var(--line);border-radius:8px;padding:12px;font-size:16px;line-height:1.4;outline:none;resize:vertical}
+input[type=text]:focus,textarea:focus{border-color:var(--c,var(--obj));box-shadow:0 0 0 3px rgba(23,162,255,.15)}
+.quote{border-left:3px solid var(--muted);padding:6px 10px;margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.4}
+.quote span{font-family:var(--mono);font-size:10px;letter-spacing:.14em;margin-right:8px;color:var(--text)}
+.prod{background:var(--panel);border:1px dashed var(--line);border-radius:8px;padding:12px;margin-top:16px;line-height:1.45}
+.prod-t{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--other);margin-bottom:6px}
+.prod .ghost{margin-top:10px}
+.goals{display:grid;gap:8px}
+.goal{display:block;text-align:left;width:100%;background:var(--panel);border:1.5px solid var(--line);border-radius:8px;padding:11px 12px;min-height:56px}
+.goal b{display:block;font-family:var(--mono);font-size:12px;letter-spacing:.14em;margin-bottom:2px}
+.goal span{display:block;font-size:13px;color:var(--muted);line-height:1.35}
+.goal.on{border-color:var(--obj);background:var(--panel2)}
+.goal.on b{color:var(--obj)}
+.scan{display:grid;gap:8px}
+.scan .item{background:var(--panel);border-radius:8px;padding:10px 12px;border-left:3px solid var(--other);line-height:1.4;font-size:14px}
+.scan .item i{display:block;font-style:normal;font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--other);margin-bottom:3px}
+.scan .none{color:var(--muted);font-size:14px}
+.addrow{display:flex;gap:8px}
+.addrow input{flex:1}
+.addrow .btn{flex:none;width:76px;min-height:48px;font-size:13px}
+.chips{display:grid;gap:8px;margin-top:12px}
+.chip{display:flex;align-items:flex-start;gap:8px;background:var(--panel);border:1.5px solid var(--c);border-radius:8px;padding:10px 6px 10px 12px;line-height:1.4}
+.chip span{flex:1;word-break:break-word}
+.chip button{flex:none;width:36px;height:30px;border:0;background:none;color:var(--muted);font-size:20px;line-height:1;padding:0}
+.chip.known{--c:var(--known)} .chip.unknown{--c:var(--unk)}
+.chip small{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--known)}
+.count{font-family:var(--mono);font-size:12px;color:var(--muted);margin-bottom:10px;letter-spacing:.06em}
+.link{background:var(--panel);border:1.5px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden}
+.link.open{border-color:var(--text)}
+.link-h{display:block;width:100%;text-align:left;background:none;border:0;padding:12px;min-height:56px}
+.link-h b{font-family:var(--mono);font-size:12px;letter-spacing:.08em}
+.link-h>span{display:block;color:var(--muted);font-size:13px;margin-top:3px;line-height:1.35}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:baseline}
+.link-b{padding:0 12px 14px}
+.link-b .q{font-size:14px;line-height:1.4;margin:10px 0 6px}
+.link-b .dir{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);margin-top:12px}
+.qrow{display:flex;gap:8px}
+.qrow input{flex:1}
+.qrow button{flex:none;width:56px}
+.meter{background:var(--panel);border:1.5px solid var(--line);border-radius:10px;padding:12px}
+.meter-top{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono)}
+.pill{font-size:12px;font-weight:700;letter-spacing:.14em}
+.bar{height:8px;border-radius:4px;background:var(--line);margin:10px 0 8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--c);transition:width .25s}
+.meter small{display:block;color:var(--muted);font-size:12px;line-height:1.4}
+.gaps{display:grid;gap:8px;margin-top:12px}
+.gap{background:var(--panel);border-left:3px solid var(--unk);border-radius:8px;padding:9px 12px;font-size:14px;line-height:1.4}
+.gap.ok{border-color:var(--known);color:var(--muted)}
+.plan{background:var(--panel);border:1.5px solid var(--unk);border-radius:10px;padding:12px;margin-bottom:10px}
+.plan-h{font-weight:600;line-height:1.35;word-break:break-word}
+.plan .lab{margin-top:10px}
+.plan .btn{margin-top:12px;min-height:44px;font-size:12px;flex:none;width:100%}
+.done-item{background:var(--panel);border-left:3px solid var(--known);border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:14px;line-height:1.4}
+.done-item small{display:block;color:var(--muted)}
+.row2{display:flex;gap:8px}
+.row2 .btn{min-height:44px;font-size:12px}
+.toggle{display:flex;align-items:center;gap:10px;background:var(--panel);border:1.5px solid var(--line);border-radius:8px;padding:12px;width:100%;text-align:left;min-height:50px}
+.toggle i{flex:none;width:22px;height:22px;border:2px solid var(--muted);border-radius:5px;display:grid;place-items:center;font-style:normal;font-size:14px;line-height:1}
+.toggle.on i{background:var(--other);border-color:var(--other);color:var(--bg)}
+.card{background:var(--panel);border:1.5px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+.card-main{display:block;width:100%;text-align:left;background:none;border:0;padding:0}
+.card-q{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4;font-weight:600;word-break:break-word}
+.card-m{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted)}
+.card .bar{margin:8px 0 0;height:5px}
+.card-x{display:flex;gap:8px;margin-top:10px}
+.card-x .ghost{flex:1}
+.empty{color:var(--muted);line-height:1.5;padding:8px 0}
+.sheet{position:fixed;inset:0;background:rgba(10,15,24,.92);z-index:10;display:flex;flex-direction:column;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));overflow-y:auto}
+.sheet[hidden]{display:none}
+.sheet textarea{font-family:var(--mono);font-size:12px;min-height:110px}
+.stat{font-family:var(--mono);font-size:12px;margin:8px 0;line-height:1.5}
+.stat.bad{color:var(--unk)} .stat.good{color:var(--known)}
+#toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));background:var(--text);color:var(--bg);padding:11px 14px;border-radius:8px;font-size:14px;z-index:20;opacity:0;pointer-events:none;transition:opacity .2s;text-align:center}
+#toast.on{opacity:1}
+svg text{font-family:var(--mono)}
+.node{cursor:pointer}
+.node.active{filter:drop-shadow(0 0 7px currentColor)}
+.edge{fill:none}
+.edge.hl{filter:drop-shadow(0 0 4px currentColor)}
+.elab{paint-order:stroke;stroke:#141d2b;stroke-width:4px;stroke-linejoin:round;font-size:9px}
+:focus-visible{outline:2px solid var(--obj);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">ROQ // QUESTIONING</div>
+    <button class="hbtn" id="hbtn" data-act="home">DATA</button>
+  </header>
+  <div id="mapwrap"></div>
+  <button id="maptoggle" data-act="maptoggle">MAP ▴</button>
+  <main id="main"></main>
+  <footer id="foot"></footer>
+</div>
+<div id="toast" role="status"></div>
+<div id="sheet" class="sheet" hidden></div>
+
+<script>
+(function(){
+'use strict';
+var KEY='roq.v1';
+var $=function(s){return document.querySelector(s)};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+var trunc=function(s,n){s=String(s||'').trim().replace(/\s+/g,' ');return s.length>n?s.slice(0,n-1)+'…':s};
+
+/* ---------- storage (best effort; Backup is the safety net) ---------- */
+var storageOK=true;
+function load(){
+  try{var t=localStorage.getItem(KEY);if(t){var o=JSON.parse(t);if(o&&Array.isArray(o.items))return o}}
+  catch(e){storageOK=false}
+  return {items:[]};
+}
+var db=load();
+try{localStorage.setItem('roq.t','1');localStorage.removeItem('roq.t')}catch(e){storageOK=false}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){storageOK=false}}
+var saveT=null;function saveSoon(){clearTimeout(saveT);saveT=setTimeout(save,350)}
+
+/* ---------- model definitions ---------- */
+var COL={you:'#ffffff',object:'#17a2ff',known:'#2fd25a',others:'#ffd02b',unknown:'#ff4a1c'};
+var NAME={you:'You',object:'Object',known:'Known',unknown:'Unknown',others:'Others'};
+var N={
+  known:{x:180,y:36,w:104,h:32,s:'rect'},
+  object:{x:180,y:125,w:120,h:48,s:'hex'},
+  unknown:{x:180,y:214,w:104,h:32,s:'brk'},
+  you:{x:46,y:125,r:38,s:'circ'},
+  others:{x:314,y:125,r:38,s:'circ'}
+};
+var PAIRS=[
+  {k:'yo',a:'you',b:'object',f:'What do you do with, or to, the object?',r:'How does the object change your state?'},
+  {k:'ok',a:'object',b:'known',f:'What must the object do or offer to connect to what you know?',r:'How does what you know affect the object?'},
+  {k:'ou',a:'object',b:'unknown',f:'What must the object do or offer for the unknown to be found?',r:'If the unknown were found, how would it change the object?'},
+  {k:'yk',a:'you',b:'known',f:'How do you use what you know?',r:'How does what you know change your position?'},
+  {k:'yu',a:'you',b:'unknown',f:'What would you have to do to reach the unknown?',r:'How would learning it change your position?'},
+  {k:'xo',a:'others',b:'object',f:'What do they do with, or to, the object?',r:'How does the object change their state?',x:1},
+  {k:'xk',a:'others',b:'known',f:'How do they relate to what is known?',r:'How does what is known change their position?',x:1},
+  {k:'xu',a:'others',b:'unknown',f:'Could they hold or reveal the unknown? How?',r:'How would the unknown change their position?',x:1}
+];
+var STEPS=[
+  {id:'question',t:'The question',node:null},
+  {id:'object',t:'The Object',node:'object'},
+  {id:'known',t:'What you know',node:'known'},
+  {id:'unknown',t:'What you don’t',node:'unknown'},
+  {id:'you',t:'Your position',node:'you'},
+  {id:'others',t:'Other positions',node:'others'},
+  {id:'links',t:'Connections',node:null},
+  {id:'reframe',t:'Reframe and plan',node:null}
+];
+var GOALS=[
+  {id:'past',n:'PAST',t:'To understand the reason for an event'},
+  {id:'present',n:'PRESENT',t:'To experience something new, or understand how something works'},
+  {id:'future',n:'FUTURE',t:'To predict the effect of an event'}
+];
+var PRODS={
+  object:['If you deleted one noun from the question, which deletion would leave it meaningless?','Is this the core element, or a detail standing next to it?','Can you name it in one or two words?','Is the object a thing, a person, a process or a state?'],
+  known:['Which of these do you hold as fact, and which do you assume?','Where did each known come from, and do you trust that source?','Which known would change the question if it turned out false?','What did you stop questioning a while ago?'],
+  unknown:['What exact piece of information is missing?','Is it missing for you only, or for everyone?','Which unknown, once solved, would shrink the others?','Is any unknown absent from this list because the answer might be unwelcome?'],
+  you:['What is your view of the object, and what is it based on?','What are you trying to achieve here?','What changes for you under each possible answer?','What do you carry into this: time, resources, authority, history?'],
+  others:['Who else has a stake in the object?','What do they want from it?','What might they know that you do not?','Whose position would change the answer?'],
+  links:['Which line is hardest to label? That is usually where the question is blurry.','If a line stays ???, is it an unknown you have not listed yet?','Does the relationship run both ways, or only one?','Which connection would you be least able to defend if asked?'],
+  reframe:['Does the new question name the object?','Could someone answer it without asking you anything back?','Does it point at one unknown?','Is it one question, or several joined together?']
+};
+
+/* ---------- state ---------- */
+var it=null,step=0,view='home',openPair=null,foundIdx=null,confirmDel=null,mapOff=false;
+var prodIdx={};
+
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function newItem(){
+  return {id:uid(),created:Date.now(),updated:Date.now(),raw:'',goal:null,object:'',known:[],unknown:[],
+    you:{view:'',stake:''},others:{skip:false,who:'',view:'',holds:''},rel:{},rewritten:'',step:0};
+}
+function pairs(x){return PAIRS.filter(function(p){return !p.x||!x.others.skip})}
+function labelled(x,p){var r=x.rel[p.k];return !!(r&&((r.f||'').trim()||(r.b||'').trim()))}
+function openUnknowns(x){return x.unknown.filter(function(u){return !u.done})}
+function score(x){
+  var s=0,ps=pairs(x),lab=ps.filter(function(p){return labelled(x,p)}).length;
+  if(x.raw.trim())s+=10; if(x.goal)s+=10; if(x.object.trim())s+=15;
+  if(x.known.length)s+=10; if(x.unknown.length)s+=15; if(x.you.view.trim())s+=10;
+  s+=Math.round(20*Math.min(1,lab/ps.length));
+  if(x.rewritten.trim())s+=10;
+  return s;
+}
+function stateOf(s){return s<40?{n:'ROUGH',c:'#ff4a1c'}:s<90?{n:'FOCUSING',c:'#ffd02b'}:{n:'PRECISE',c:'#2fd25a'}}
+
+/* ---------- scan: fixed rules that read the question text ---------- */
+function scan(text,goal){
+  var t=text.trim(),out=[];if(!t)return out;
+  var w=t.split(/\s+/).filter(Boolean),m;
+  if(w.length<=7)out.push(['ROUGH','Short and open. Which single noun does everything hang on?']);
+  if((m=t.match(/\b(better|best|good|great|improve|more|less|optimi[sz]e|grow|success|succeed|fix)\b/i)))out.push(['VAGUE','“'+m[0]+'” compared to what, and measured how?']);
+  if((m=t.match(/\b(get|achieve|reach|win|land)\b/i)))out.push(['DONE','What does done look like? Name the moment you would stop asking.']);
+  if(/\bhow\s+(do|can|should|would|could)\s+(i|we)\b/i.test(t)&&w.length>7&&w.length<=12)out.push(['ROUGH','“How do I…” can skip the object. What exactly are you acting on?']);
+  if((m=t.match(/\b(they|them|people|everyone|everybody|customers?|clients?|users?|others?|team|management|boss)\b/i)))out.push(['OTHER POSITION','“'+m[0]+'” is a position. Do you know their view, or are you guessing it?']);
+  if(/\bshould\b/i.test(t))out.push(['WHOSE RULE','Should according to whom? Whose position sets that?']);
+  if(/\bwhy\b/i.test(t)&&goal&&goal!=='past')out.push(['GOAL CHECK','Why points at the past. Do you want the cause, or the effect that comes next?']);
+  if((t.match(/\?/g)||[]).length>1||(w.length>16&&/\b(and|or)\b/i.test(t)))out.push(['SPLIT','This may be more than one question. Which comes first?']);
+  if(!goal)out.push(['GOAL','Origin, process or result: which is this question after?']);
+  return out.slice(0,4);
+}
+function scanHTML(){
+  var s=scan(it.raw,it.goal);
+  if(!it.raw.trim())return '<div class="none">Nothing to scan yet.</div>';
+  if(!s.length)return '<div class="none">Nothing flagged. Move on and let the model test it.</div>';
+  return s.map(function(x){return '<div class="item"><i>'+esc(x[0])+'</i>'+esc(x[1])+'</div>'}).join('');
+}
+
+/* ---------- gaps ---------- */
+function gaps(x){
+  var g=[],ps=pairs(x),lab=ps.filter(function(p){return labelled(x,p)}).length;
+  if(!x.object.trim())g.push('No Object yet. Name the core element of the question.');
+  if(!x.known.length)g.push('Nothing known. Without an anchor the question floats. What do you hold as fact?');
+  if(!x.unknown.length)g.push('No unknowns listed. A question with nothing missing has no work in it.');
+  if(!x.you.view.trim())g.push('Your position is blank. What view are you bringing to this?');
+  if(!x.others.skip&&!x.others.who.trim()&&!x.others.view.trim())g.push('No other positions. Whose view would change the answer?');
+  if(lab<ps.length)g.push((ps.length-lab)+' of '+ps.length+' connections have no label. Unlabelled lines are where the question stays blurry.');
+  var qq=0;Object.keys(x.rel).forEach(function(k){var r=x.rel[k];if(r.f==='???')qq++;if(r.b==='???')qq++});
+  if(qq)g.push(qq+' connection'+(qq>1?'s are':' is')+' marked ???. Each one may be an unknown you have not listed.');
+  var nh=openUnknowns(x).filter(function(u){return !(u.holder||'').trim()}).length;
+  if(nh)g.push(nh+' open unknown'+(nh>1?'s have':' has')+' no holder. Who or what could resolve it?');
+  if(!x.rewritten.trim())g.push('The question is not rewritten yet.');
+  else if(x.rewritten.trim().toLowerCase()===x.raw.trim().toLowerCase())g.push('The rewrite matches the original. What did the model show you?');
+  return g;
+}
+
+/* ---------- map ---------- */
+function inside(n,px,py,g){
+  if(n.s==='circ')return Math.hypot(px-n.x,py-n.y)<=n.r+g;
+  return Math.abs(px-n.x)<=n.w/2+g&&Math.abs(py-n.y)<=n.h/2+g;
+}
+function arrow(a,b,o){
+  var A=N[a],B=N[b],dx=B.x-A.x,dy=B.y-A.y,L=Math.hypot(dx,dy);dx/=L;dy/=L;
+  var nx=-dy,ny=dx,sx=A.x+nx*o,sy=A.y+ny*o,ex=B.x+nx*o,ey=B.y+ny*o,t=0;
+  while(inside(A,sx+dx*t,sy+dy*t,2)&&t<200)t++;
+  var s={x:sx+dx*t,y:sy+dy*t};t=0;
+  while(inside(B,ex-dx*t,ey-dy*t,5)&&t<200)t++;
+  return {s:s,e:{x:ex-dx*t,y:ey-dy*t},nx:nx,ny:ny};
+}
+function nodeText(id,x){
+  if(!x)return '';
+  if(id==='object')return trunc(x.object,17)||'—';
+  if(id==='known'){var n=x.known.length;return n?n+' · '+trunc(x.known[n-1].t,11):'—'}
+  if(id==='unknown'){var o=openUnknowns(x);return o.length?o.length+' · '+trunc(o[0].t,11):'—'}
+  if(id==='you')return trunc(x.you.view,10)||'—';
+  if(id==='others')return x.others.skip?'n/a':(trunc(x.others.who,10)||'—');
+  return '';
+}
+function mapSVG(x,active,hl){
+  var o='<svg viewBox="0 0 360 250" role="img" aria-label="Relationship-Oriented-Questioning model map"><defs>';
+  Object.keys(COL).forEach(function(k){o+='<marker id="ah-'+k+'" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="'+COL[k]+'"/></marker>'});
+  o+='</defs>';
+  var ps=x?pairs(x):PAIRS.filter(function(p){return true}),labels='';
+  ps.forEach(function(p){
+    [[p.a,p.b,'f'],[p.b,p.a,'b']].forEach(function(d){
+      var g=arrow(d[0],d[1],6),dotted=!(d[0]==='you'||d[0]==='others'||(d[0]==='object'&&(d[1]==='known'||d[1]==='unknown')));
+      var lab=x&&x.rel[p.k]?(x.rel[p.k][d[2]]||'').trim():'',on=hl===p.k;
+      var op=x?(on?1:(lab?.95:.42)):.7,w=on?2.6:(lab?2:1.4);
+      o+='<path class="edge'+(on?' hl':'')+'" d="M'+g.s.x.toFixed(1)+' '+g.s.y.toFixed(1)+'L'+g.e.x.toFixed(1)+' '+g.e.y.toFixed(1)+'" stroke="'+COL[d[0]]+'" style="color:'+COL[d[0]]+'" stroke-width="'+w+'" opacity="'+op+'"'+(dotted?' stroke-dasharray="1.5 3.5" stroke-linecap="round"':'')+' marker-end="url(#ah-'+d[0]+')"/>';
+    });
+  });
+  o+=labels;
+  Object.keys(N).forEach(function(id){
+    var n=N[id],c=COL[id],act=active===id,dim=x&&id==='others'&&x.others.skip;
+    o+='<g class="node'+(act?' active':'')+'" data-act="mapnode" data-id="'+id+'" style="color:'+c+'" opacity="'+(dim?.3:(act||!active?1:.8))+'">';
+    var sw=act?3:2,sh='';
+    if(n.s==='circ')sh='<circle cx="'+n.x+'" cy="'+n.y+'" r="'+n.r+'" fill="#141d2b" stroke="'+c+'" stroke-width="'+sw+'"/>';
+    else if(n.s==='rect')sh='<rect x="'+(n.x-n.w/2)+'" y="'+(n.y-n.h/2)+'" width="'+n.w+'" height="'+n.h+'" fill="#141d2b" stroke="'+c+'" stroke-width="'+sw+'"/>';
+    else if(n.s==='hex'){var l=n.x-n.w/2,r=n.x+n.w/2,t=n.y-n.h/2,b=n.y+n.h/2,q=n.h*.2;
+      sh='<polygon points="'+l+','+(n.y-q)+' '+n.x+','+t+' '+r+','+(n.y-q)+' '+r+','+(n.y+q)+' '+n.x+','+b+' '+l+','+(n.y+q)+'" fill="#141d2b" stroke="'+c+'" stroke-width="'+sw+'" stroke-linejoin="round"/>'}
+    else{var l2=n.x-n.w/2,r2=n.x+n.w/2,t2=n.y-n.h/2,b2=n.y+n.h/2;
+      sh='<rect x="'+l2+'" y="'+t2+'" width="'+n.w+'" height="'+n.h+'" fill="#141d2b" stroke="none"/><path d="M'+(l2+12)+' '+t2+'H'+l2+'V'+(t2+12)+'M'+(r2-12)+' '+b2+'H'+r2+'V'+(b2-12)+'" fill="none" stroke="'+c+'" stroke-width="'+(sw+.5)+'"/>'}
+    var cap=id==='unknown'?'UNKNOWN':id==='others'?'OTHERS':id.toUpperCase(),txt=nodeText(id,x);
+    var ty=txt?n.y-3:n.y+3;
+    sh+='<text x="'+n.x+'" y="'+ty+'" text-anchor="middle" font-size="8.5" letter-spacing="1.2" fill="'+c+'">'+cap+'</text>';
+    if(txt)sh+='<text x="'+n.x+'" y="'+(n.y+10)+'" text-anchor="middle" font-size="10" fill="#e8eef7">'+esc(txt)+'</text>';
+    o+=sh+'</g>';
+  });
+  return o+'</svg>';
+}
+function renderMap(){
+  var hl=view==='wizard'&&STEPS[step].id==='links'?openPair:null;
+  var act=view==='wizard'?STEPS[step].node:null;
+  var cap='';
+  if(hl&&it){
+    var p=PAIRS.filter(function(q){return q.k===hl})[0],r=it.rel[hl]||{};
+    [['f',p.a,p.b],['b',p.b,p.a]].forEach(function(d){
+      if((r[d[0]]||'').trim())cap+='<span style="color:'+COL[d[1]]+'">'+NAME[d[1]].toUpperCase()+' → '+NAME[d[2]].toUpperCase()+'</span> '+esc(trunc(r[d[0]],30))+'<br>';
+    });
+  }
+  $('#mapwrap').innerHTML=mapSVG(view==='wizard'?it:null,act,hl)+(cap?'<div class="maplab">'+cap+'</div>':'');
+}
+
+/* ---------- views ---------- */
+function toast(t){var e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(function(){e.classList.remove('on')},2400)}
+function fmtDate(ts){try{return new Date(ts).toLocaleDateString(undefined,{month:'short',day:'numeric'})}catch(e){return ''}}
+
+function renderHome(){
+  view='home';it=null;
+  $('#hbtn').textContent='DATA';$('#hbtn').setAttribute('data-act','backup');
+  var items=db.items.slice().sort(function(a,b){return b.updated-a.updated});
+  var tot=0,res=0;items.forEach(function(x){x.unknown.forEach(function(u){tot++;if(u.done)res++})});
+  var h='<div class="crumb">'+items.length+' SAVED · '+res+' OF '+tot+' UNKNOWNS RESOLVED</div>'
+   +'<h1>Break a question down before you answer it.</h1>'
+   +'<button class="btn primary" style="width:100%;margin:6px 0 16px" data-act="new">NEW QUESTION</button>';
+  if(!items.length)h+='<div class="empty">Nothing saved yet. Start with the question exactly as it first comes to you.</div>';
+  items.forEach(function(x){
+    var s=score(x),st=stateOf(s),ou=x.unknown.length;
+    h+='<div class="card"><button class="card-main" data-act="open" data-id="'+x.id+'"><div class="card-q">'+esc(x.raw||'(untitled)')+'</div>'
+     +'<div class="card-m"><span style="color:'+st.c+'">'+st.n+'</span><span>'+(ou?x.unknown.filter(function(u){return u.done}).length+'/'+ou+' RESOLVED · ':'')+fmtDate(x.updated)+'</span></div>'
+     +'<div class="bar" style="--c:'+st.c+'"><i style="width:'+s+'%"></i></div></button>';
+    if(confirmDel===x.id)h+='<div class="card-x"><button class="ghost" data-act="delyes" data-id="'+x.id+'" style="color:#ff4a1c;border-color:#ff4a1c">DELETE FOR GOOD</button><button class="ghost" data-act="delno">KEEP</button></div>';
+    else h+='<div class="card-x"><button class="ghost" data-act="delask" data-id="'+x.id+'">DELETE</button></div>';
+    h+='</div>';
+  });
+  $('#main').innerHTML=h;$('#foot').innerHTML='';$('#foot').style.display='none';
+  renderMap();$('#main').scrollTop=0;
+}
+
+function prodBox(id){
+  var a=PRODS[id],i=(prodIdx[id]||0)%a.length;
+  return '<div class="prod"><div class="prod-t" id="prodt">PROD '+(i+1)+' / '+a.length+'</div><div id="prodx">'+esc(a[i])+'</div><button class="ghost" data-act="prod" data-id="'+id+'">ANOTHER PROD</button></div>';
+}
+function quote(){return it.raw.trim()?'<div class="quote"><span>Q</span>'+esc(trunc(it.raw,150))+'</div>':''}
+function chips(list,cls){
+  var h='<div class="chips" id="chips">';
+  it[list].forEach(function(e,i){
+    if(list==='unknown'&&e.done)return;
+    h+='<div class="chip '+cls+'"><span>'+(e.from==='found'?'<small>↑ FOUND</small>':'')+esc(e.t)+'</span><button data-act="del" data-list="'+list+'" data-i="'+i+'" aria-label="Remove">×</button></div>';
+  });
+  return h+'</div>';
+}
+function addRow(list,label){
+  return '<label class="lab" for="addin">'+label+'</label><div class="addrow"><input type="text" id="addin" data-list="'+list+'" autocomplete="off" enterkeyhint="done"><button class="btn" data-act="add" data-list="'+list+'">ADD</button></div>';
+}
+function field(label,path,val,multi,col){
+  var id='f_'+path.replace(/\./g,'_');
+  return '<label class="lab" for="'+id+'">'+label+'</label>'+(multi
+    ?'<textarea id="'+id+'" data-bind="'+path+'" rows="3" style="--c:'+col+'">'+esc(val)+'</textarea>'
+    :'<input type="text" id="'+id+'" data-bind="'+path+'" value="'+esc(val)+'" autocomplete="off" style="--c:'+col+'">');
+}
+function linkCard(p){
+  var r=it.rel[p.k]||{},open=openPair===p.k,sum=(r.f||r.b)?[trunc(r.f,22),trunc(r.b,22)].filter(Boolean).join('  |  '):'Tap to label';
+  var h='<div class="link'+(open?' open':'')+'"><button class="link-h" data-act="pair" data-k="'+p.k+'"><b><span class="dot" style="background:'+COL[p.a]+'"></span>'+NAME[p.a].toUpperCase()+' ⇄ <span class="dot" style="background:'+COL[p.b]+'"></span>'+NAME[p.b].toUpperCase()+'</b><span>'+esc(sum)+'</span></button>';
+  if(open){
+    h+='<div class="link-b">';
+    [['f',p.a,p.b,p.f],['b',p.b,p.a,p.r]].forEach(function(d){
+      var path='rel.'+p.k+'.'+d[0],id='f_'+p.k+d[0];
+      h+='<div class="dir">'+NAME[d[1]].toUpperCase()+' → '+NAME[d[2]].toUpperCase()+'</div><div class="q">'+d[3]+'</div>'
+       +'<div class="qrow"><input type="text" id="'+id+'" data-bind="'+path+'" value="'+esc(r[d[0]]||'')+'" autocomplete="off" style="--c:'+COL[d[1]]+'"><button class="ghost" data-act="qq" data-path="'+path+'" data-id="'+id+'">???</button></div>';
+    });
+    h+='</div>';
+  }
+  return h+'</div>';
+}
+function meterHTML(){
+  var s=score(it),st=stateOf(s);
+  return '<div class="meter"><div class="meter-top"><span class="pill" style="color:'+st.c+'">'+st.n+'</span><span>'+s+' / 100</span></div><div class="bar" style="--c:'+st.c+'"><i style="width:'+s+'%"></i></div><small>Measures how fully the question is mapped. It does not judge whether the question is good.</small></div>';
+}
+function gapsHTML(){
+  var g=gaps(it);
+  if(!g.length)return '<div class="gaps"><div class="gap ok">Every component is filled and every line labelled.</div></div>';
+  return '<div class="gaps">'+g.map(function(x){return '<div class="gap">'+esc(x)+'</div>'}).join('')+'</div>';
+}
+function planHTML(){
+  var o=openUnknowns(it),h='';
+  o.forEach(function(u){
+    var i=it.unknown.indexOf(u);
+    h+='<div class="plan"><div class="plan-h">'+esc(u.t)+'</div>'
+     +field('Who or what holds the answer?','unknown.'+i+'.holder',u.holder||'',false,COL.unknown)
+     +field('First step to find out','unknown.'+i+'.next',u.next||'',false,COL.unknown);
+    if(foundIdx===i)h+='<label class="lab" for="foundin">What did you find?</label><input type="text" id="foundin" autocomplete="off" style="--c:#2fd25a"><div class="row2" style="margin-top:10px"><button class="btn primary" data-act="foundyes" data-i="'+i+'">MOVE TO KNOWN</button><button class="btn" data-act="foundno">CANCEL</button></div>';
+    else h+='<button class="btn" data-act="found" data-i="'+i+'">FOUND IT</button>';
+    h+='</div>';
+  });
+  if(!o.length)h+='<div class="empty">No open unknowns.</div>';
+  var d=it.unknown.filter(function(u){return u.done});
+  if(d.length){h+='<div class="lab">Resolved</div>';d.forEach(function(u){h+='<div class="done-item">'+esc(u.t)+'<small>→ '+esc(u.answer||'')+'</small></div>'})}
+  return h;
+}
+
+function stepBody(id){
+  switch(id){
+  case 'question':
+    return '<label class="lab" for="raw">Ask it the way it first comes out</label><textarea id="raw" data-bind="raw" rows="3" autocapitalize="sentences" style="--c:#17a2ff">'+esc(it.raw)+'</textarea>'
+     +'<div class="lab">What is this question after?</div><div class="goals">'+GOALS.map(function(g){return '<button class="goal'+(it.goal===g.id?' on':'')+'" data-act="goal" data-id="'+g.id+'"><b>'+g.n+'</b><span>'+g.t+'</span></button>'}).join('')+'</div>'
+     +'<div class="lab">Scan</div><div class="scan" id="scan">'+scanHTML()+'</div>';
+  case 'object':
+    return quote()+field('What is the core element of the question?','object',it.object,false,COL.object)+prodBox('object');
+  case 'known':
+    return quote()+addRow('known','What do you already know about the object?')+chips('known','known')+prodBox('known');
+  case 'unknown':
+    return quote()+addRow('unknown','What are you missing?')+chips('unknown','unknown')+prodBox('unknown');
+  case 'you':
+    return quote()+field('Your view of the object','you.view',it.you.view,true,COL.you)+field('What changes for you depending on the answer?','you.stake',it.you.stake,true,COL.you)+prodBox('you');
+  case 'others':
+    return quote()+'<button class="toggle'+(it.others.skip?' on':'')+'" data-act="skipothers"><i>'+(it.others.skip?'✓':'')+'</i>No other position matters here</button>'
+     +(it.others.skip?'':field('Who else has a stake?','others.who',it.others.who,false,COL.others)+field('How do they see the object?','others.view',it.others.view,true,COL.others)+field('What might they know or hold that you do not?','others.holds',it.others.holds,true,COL.others)+prodBox('others'));
+  case 'links':
+    var ps=pairs(it),n=ps.filter(function(p){return labelled(it,p)}).length;
+    return quote()+'<div class="count">'+n+' / '+ps.length+' CONNECTIONS LABELLED</div>'+ps.map(linkCard).join('')+prodBox('links');
+  case 'reframe':
+    return '<div id="meter">'+meterHTML()+'</div><div id="gaps">'+gapsHTML()+'</div>'
+     +'<div class="lab">Before</div>'+quote()
+     +field('Write the question again with what you now know','rewritten',it.rewritten,true,COL.known)+prodBox('reframe')
+     +'<div class="lab">Answer plan</div><div id="plan">'+planHTML()+'</div>';
+  }
+  return '';
+}
+var HEAD={question:'What is the question?',object:'What is it really about?',known:'What do you already hold?',unknown:'What is missing?',you:'Where do you stand?',others:'Who else is in this?',links:'How do the pieces connect?',reframe:'Reframe it. Plan the answer.'};
+
+function renderWizard(keepScroll){
+  view='wizard';
+  var st=STEPS[step],main=$('#main'),sc=main.scrollTop;
+  $('#hbtn').textContent='HOME';$('#hbtn').setAttribute('data-act','home');
+  var segs='<div class="segs">'+STEPS.map(function(s,i){var c=s.node?COL[s.node]:'#e8eef7';return '<button data-act="step" data-i="'+i+'" class="'+(i===step?'cur':i<step?'on':'')+'" style="--c:'+c+'" aria-label="Step '+(i+1)+': '+esc(s.t)+'"></button>'}).join('')+'</div>';
+  main.innerHTML='<div class="crumb">'+('0'+(step+1)).slice(-2)+' / 0'+STEPS.length+' · '+st.t.toUpperCase()+'</div>'+segs+'<h1>'+HEAD[st.id]+'</h1>'+stepBody(st.id);
+  $('#foot').style.display='flex';
+  $('#foot').innerHTML='<button class="btn" data-act="back"'+(step===0?' disabled':'')+'>BACK</button><button class="btn primary" data-act="next">'+(step===STEPS.length-1?'DONE':'NEXT')+'</button>';
+  main.scrollTop=keepScroll?sc:0;renderMap();
+}
+
+/* ---------- actions ---------- */
+function touch(){it.updated=Date.now();it.step=step;saveSoon()}
+function go(i){
+  if(step===0&&i>0&&!it.raw.trim()){toast('Type the question first.');return}
+  step=Math.max(0,Math.min(STEPS.length-1,i));openPair=null;foundIdx=null;touch();renderWizard(false);
+}
+function setPath(path,val){
+  var ks=path.split('.'),o=it;
+  for(var i=0;i<ks.length-1;i++){if(o[ks[i]]==null||typeof o[ks[i]]!=='object')o[ks[i]]={};o=o[ks[i]]}
+  o[ks[ks.length-1]]=val;
+}
+function live(){
+  renderMap();
+  var s=$('#scan');if(s)s.innerHTML=scanHTML();
+  var m=$('#meter');if(m){m.innerHTML=meterHTML();$('#gaps').innerHTML=gapsHTML()}
+}
+function addItem(list){
+  var inp=$('#addin'),v=inp.value.trim();if(!v)return;
+  it[list].push(list==='known'?{t:v,from:'start'}:{t:v,holder:'',next:'',done:false,answer:''});
+  touch();renderWizard(true);var n=$('#addin');if(n)n.focus();
+}
+function openItem(id){
+  it=db.items.filter(function(x){return x.id===id})[0];if(!it)return;
+  step=Math.min(it.step||0,STEPS.length-1);openPair=null;foundIdx=null;renderWizard(false);
+}
+
+/* ---------- backup sheet ---------- */
+function openBackup(){
+  var sh=$('#sheet');sh.hidden=false;
+  sh.innerHTML='<div class="logo" style="align-self:flex-start;margin-bottom:12px">DATA</div>'
+   +'<div class="stat '+(storageOK?'good':'bad')+'">'+(storageOK?'Saving on this device.':'This browser is blocking storage. Copy a backup after each session.')+'</div>'
+   +'<label class="lab" for="bk">Backup (all questions)</label><textarea id="bk" readonly rows="5">'+esc(JSON.stringify(db))+'</textarea>'
+   +'<div class="row2" style="margin-top:8px"><button class="btn" data-act="copy">COPY BACKUP</button></div>'
+   +'<label class="lab" for="rs">Restore: paste a backup here</label><textarea id="rs" rows="4"></textarea>'
+   +'<div class="row2" style="margin-top:8px"><button class="btn" data-act="restore">MERGE INTO THIS DEVICE</button></div><div class="stat" id="rsmsg"></div>'
+   +'<button class="btn primary" style="flex:none;margin-top:12px" data-act="closesheet">CLOSE</button>';
+}
+function doRestore(){
+  var t=$('#rs').value.trim(),msg=$('#rsmsg');
+  try{
+    var o=JSON.parse(t);if(!o||!Array.isArray(o.items))throw 0;
+    var add=0,upd=0;
+    o.items.forEach(function(x){
+      if(!x||typeof x.id!=='string'||typeof x.raw!=='string')return;
+      var ex=db.items.filter(function(y){return y.id===x.id})[0];
+      if(!ex){db.items.push(x);add++}else if((x.updated||0)>(ex.updated||0)){db.items[db.items.indexOf(ex)]=x;upd++}
+    });
+    save();msg.className='stat good';msg.textContent='Added '+add+', updated '+upd+'.';
+  }catch(e){msg.className='stat bad';msg.textContent='That text is not a valid backup. Paste the whole thing, starting with {.'}
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',function(e){
+  var el=e.target.closest('[data-act]');if(!el)return;
+  var a=el.getAttribute('data-act'),d=el.dataset;
+  switch(a){
+  case 'new':it=newItem();db.items.push(it);step=0;save();renderWizard(false);break;
+  case 'open':openItem(d.id);break;
+  case 'home':if(it){it.step=step;save()}confirmDel=null;renderHome();break;
+  case 'backup':openBackup();break;
+  case 'closesheet':$('#sheet').hidden=true;break;
+  case 'copy':
+    var bk=$('#bk');bk.select();
+    try{navigator.clipboard.writeText(bk.value).then(function(){toast('Backup copied.')},function(){toast('Text selected. Press and hold, then Copy.')})}
+    catch(x){toast('Text selected. Press and hold, then Copy.')}
+    break;
+  case 'restore':doRestore();break;
+  case 'delask':confirmDel=d.id;renderHome();break;
+  case 'delno':confirmDel=null;renderHome();break;
+  case 'delyes':db.items=db.items.filter(function(x){return x.id!==d.id});confirmDel=null;save();renderHome();break;
+  case 'back':go(step-1);break;
+  case 'next':if(step===STEPS.length-1){it.step=step;save();confirmDel=null;renderHome()}else go(step+1);break;
+  case 'step':go(+d.i);break;
+  case 'goal':it.goal=d.id;touch();renderWizard(true);break;
+  case 'add':addItem(d.list);break;
+  case 'del':it[d.list].splice(+d.i,1);touch();renderWizard(true);break;
+  case 'prod':
+    prodIdx[d.id]=(prodIdx[d.id]||0)+1;var arr=PRODS[d.id],i=prodIdx[d.id]%arr.length;
+    $('#prodx').textContent=arr[i];$('#prodt').textContent='PROD '+(i+1)+' / '+arr.length;break;
+  case 'pair':openPair=openPair===d.k?null:d.k;renderWizard(true);break;
+  case 'qq':setPath(d.path,'???');var f=document.getElementById(d.id);if(f)f.value='???';touch();live();break;
+  case 'skipothers':it.others.skip=!it.others.skip;openPair=null;touch();renderWizard(true);break;
+  case 'found':foundIdx=+d.i;renderWizard(true);var fi=$('#foundin');if(fi)fi.focus();break;
+  case 'foundno':foundIdx=null;renderWizard(true);break;
+  case 'foundyes':
+    var u=it.unknown[+d.i],ans=($('#foundin').value||'').trim();
+    u.done=true;u.answer=ans||u.t;it.known.push({t:ans||u.t,from:'found',src:u.t});
+    foundIdx=null;touch();renderWizard(true);toast('Unknown became Known.');break;
+  case 'mapnode':
+    if(view!=='wizard')break;
+    var map={object:1,known:2,unknown:3,you:4,others:5};go(map[d.id]);break;
+  case 'maptoggle':
+    mapOff=!mapOff;$('#mapwrap').classList.toggle('off',mapOff);el.textContent=mapOff?'MAP ▾':'MAP ▴';break;
+  }
+});
+document.addEventListener('input',function(e){
+  var el=e.target,p=el.getAttribute&&el.getAttribute('data-bind');
+  if(!p||!it)return;
+  setPath(p,el.value);touch();
+  if(p==='raw')live();else live();
+  if(p.indexOf('rel.')===0){
+    var sm=document.querySelector('.link.open .link-h>span'),rr=it.rel[p.split('.')[1]]||{};
+    if(sm)sm.textContent=(rr.f||rr.b)?[trunc(rr.f,22),trunc(rr.b,22)].filter(Boolean).join('  |  '):'Tap to label';
+    var hdr=document.querySelector('.count');if(hdr){var ps=pairs(it),n=ps.filter(function(q){return labelled(it,q)}).length;hdr.textContent=n+' / '+ps.length+' CONNECTIONS LABELLED'}
+  }
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&e.target.id==='addin'){e.preventDefault();addItem(e.target.getAttribute('data-list'))}
+});
+/* hide the map while the keyboard is up so the field stays visible */
+var kbT=null;
+document.addEventListener('focusin',function(e){
+  if(e.target.matches&&e.target.matches('input,textarea')&&!e.target.closest('.sheet')){clearTimeout(kbT);$('#mapwrap').classList.add('off')}
+});
+document.addEventListener('focusout',function(){
+  kbT=setTimeout(function(){if(!mapOff&&!(document.activeElement&&document.activeElement.matches&&document.activeElement.matches('input,textarea')))$('#mapwrap').classList.remove('off')},250);
+});
+
+renderHome();
+if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0){
+  try{navigator.serviceWorker.register('./sw.js').catch(function(){})}catch(e){}
+}
+window.__roq={score:score,scan:scan,gaps:gaps,newItem:newItem,db:function(){return db}};
+})();
+</script>
+</body>
+</html>
